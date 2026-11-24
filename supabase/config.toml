@@ -1,0 +1,49 @@
+project_id = "chopinz"
+[functions.health]
+verify_jwt = false
+[functions.categories]
+verify_jwt = false
+[functions.business-categories]
+verify_jwt = false
+[functions.businesses]
+verify_jwt = false
+[functions.products]
+verify_jwt = false
+[functions.addresses]
+verify_jwt = false
+[functions.cart]
+verify_jwt = false
+[functions.wishlist]
+verify_jwt = false
+[functions.seller-businesses]
+verify_jwt = false
+[functions.seller-locations]
+verify_jwt = false
+[functions.seller-products]
+verify_jwt = false
+[functions.seller-variants]
+verify_jwt = false
+[functions.seller-inventory]
+verify_jwt = false
+[functions.checkout]
+verify_jwt = false
+[functions.orders]
+verify_jwt = false
+[functions.payments-initialize]
+verify_jwt = false
+[functions.payments-verify]
+verify_jwt = false
+[functions.seller-orders]
+verify_jwt = false
+[functions.notifications]
+verify_jwt = false
+[functions.support]
+verify_jwt = false
+[functions.reviews]
+verify_jwt = false
+[functions.admin]
+verify_jwt = false
+[functions.payment-webhook]
+verify_jwt = false
+[functions.jobs]
+verify_jwt = false

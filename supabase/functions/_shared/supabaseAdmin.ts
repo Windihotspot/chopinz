@@ -1,0 +1,8 @@
+import {createClient} from 'https://esm.sh/@supabase/supabase-js@2.45.4';
+import {HttpError} from './https.ts';
+export function getAdminClient(){const url=Deno.env.get('SUPABASE_URL'),key=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');if(!url||!key)throw Error('Supabase server environment is not configured');return createClient(url,key,{auth:{autoRefreshToken:false,persistSession:false}})}
+export async function getAuthenticatedUser(req:Request){const token=(req.headers.get('Authorization')||'').replace(/^Bearer\s+/i,'');if(!token)return null;const {data,error}=await getAdminClient().auth.getUser(token);return error?null:data.user}
+export async function requireUser(req:Request){const user=await getAuthenticatedUser(req);if(!user)throw new HttpError(401,'Authentication required');return {user,db:getAdminClient()}}
+export async function requireRole(req:Request,roles:string[]){const {user,db}=await requireUser(req);const {data,error}=await db.from('user_roles').select('role').eq('user_id',user.id).in('role',roles).limit(1);if(error||!data?.length)throw new HttpError(403,'Insufficient permissions');return {user,db,role:data[0].role as string}}
+export async function requireBusiness(req:Request,businessId:string,roles=['owner','manager']){const {user,db}=await requireUser(req);const {data,error}=await db.from('business_members').select('role').eq('business_id',businessId).eq('user_id',user.id).in('role',roles).maybeSingle();if(error||!data)throw new HttpError(403,'Business access denied');return {user,db,role:data.role}}
+export function checked<T>(result:{data:T|null,error:unknown}){if(result.error)throw new HttpError(400,'Database operation failed',String((result.error as {message?:string}).message||result.error));return result.data as T}

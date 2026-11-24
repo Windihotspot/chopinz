@@ -1,0 +1,13 @@
+import {handle,reply,readJson,requireMethod,HttpError,text} from '../_shared/https.ts';
+import {getAdminClient,requireUser,requireRole,requireBusiness} from '../_shared/supabaseAdmin.ts';
+import {initializePayment,verifyPayment,Provider} from '../_shared/payments.ts';
+import {uuid,integer,allowed,ok,businessOf,page} from '../_shared/apiUtils.ts';
+Deno.serve(handle(async(req,cors)=>{
+ const db=getAdminClient(),pg=page(req),q=new URL(req.url).searchParams;
+ const segments=new URL(req.url).pathname.split('/').filter(Boolean);
+ const tail=segments.slice(segments.indexOf('payments-initialize')+1);
+ const [root,id,action]=[...['payments', 'initialize'],...tail];
+ let body:Record<string,unknown>={};if(['POST','PATCH','PUT'].includes(req.method))body=await readJson(req);
+ if(root==='payments'&&id==='initialize'&&req.method==='POST'){const {user}=await requireUser(req);const orderId=uuid(body.order_id),provider=body.provider as Provider;if(!['paystack','flutterwave'].includes(provider))throw new HttpError(400,'Unsupported gateway');const enabled=ok(await db.from('payment_providers').select('enabled').eq('code',provider).single()) as {enabled:boolean};if(!enabled.enabled)throw new HttpError(400,'Gateway disabled');const order=ok(await db.from('orders').select('*').eq('id',orderId).eq('user_id',user.id).single()) as {id:string;status:string;total_kobo:number;reference:string;expires_at:string};if(order.status!=='pending_payment'||new Date(order.expires_at)<=new Date())throw new HttpError(409,'Order not payable');const {data:{user:authUser}}=await db.auth.admin.getUserById(user.id);if(!authUser?.email)throw new HttpError(400,'Account email required');const reference=`${order.reference}-${provider}`;const existing=ok(await db.from('payments').select('id,provider,status').eq('order_id',orderId).maybeSingle()) as {id:string;provider:string;status:string}|null;if(existing&&existing.provider!==provider)throw new HttpError(409,'Gateway already selected for this order');if(existing?.status==='success')throw new HttpError(409,'Already paid');const init=await initializePayment(provider,{reference,amountKobo:order.total_kobo,email:authUser.email,callbackUrl:Deno.env.get('PAYMENT_CALLBACK_URL')});const payment=existing||ok(await db.from('payments').insert({order_id:orderId,provider,amount_kobo:order.total_kobo}).select('id').single()) as {id:string};ok(await db.from('payment_transactions').upsert({payment_id:payment.id,provider,provider_reference:reference,status:'initialized',checkout_url:init.checkoutUrl,raw:init.raw},{onConflict:'provider,provider_reference'}));return reply(cors,{checkout_url:init.checkoutUrl,reference})}
+ throw new HttpError(404,'Route not found');
+}));
